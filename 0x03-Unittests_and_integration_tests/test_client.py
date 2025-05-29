@@ -41,6 +41,8 @@ class TestGithubOrgClient(unittest.TestCase):
         test_repos_payload = [
             {"name": "repo1", "license": {"key": "mit"}},
             {"name": "repo2", "license": {"key": "apache-2.0"}},
+            {"name": "repo3"}, # Repo without a license key
+            {"name": "repo4", "license": {"name": "Some License"}}, # Repo with license object but no 'key'
         ]
         mock_get_json.return_value = test_repos_payload
 
@@ -48,36 +50,55 @@ class TestGithubOrgClient(unittest.TestCase):
                    new_callable=PropertyMock,
                    return_value="https://example.com/repos"):
             client = GithubOrgClient("test")
-            repos = client.public_repos()
-            self.assertEqual(repos, ["repo1", "repo2"])
+            
+            # Test without license filter
+            repos_all = client.public_repos()
+            self.assertEqual(repos_all, ["repo1", "repo2", "repo3", "repo4"])
+
+            # Test with 'mit' license filter
+            repos_mit = client.public_repos(license="mit")
+            self.assertEqual(repos_mit, ["repo1"])
+
+            # Test with 'apache-2.0' license filter
+            repos_apache = client.public_repos(license="apache-2.0")
+            self.assertEqual(repos_apache, ["repo2"])
+
+            # Test with a license that doesn't exist in the payload
+            repos_non_existent = client.public_repos(license="gpl")
+            self.assertEqual(repos_non_existent, [])
+
+            # get_json should still only be called once due to memoization
             mock_get_json.assert_called_once()
 
-    # --- Start of the different approach for test_has_license ---
 
-    @staticmethod
-    def has_license_test_cases():
-        """Provides test cases for test_has_license."""
-        return [
-            ({"license": {"key": "my_license"}}, "my_license", True),
-            ({"license": {"key": "other_license"}}, "my_license", False),
-            ({"license": {"key": "apache-2.0"}}, "apache-2.0", True),
-            ({"license": {"key": "apache-2.0"}}, "mit", False),
-            # New edge cases
-            ({"license": None}, "my_license", False),  # repo has 'license' but its value is None
-            ({}, "my_license", False),  # repo has no 'license' key at all
-            ({"name": "no_license_repo"}, "my_license", False), # repo missing 'license' entirely
-            ({"license": {"name": "GPL"}}, "my_license", False), # repo has 'license' but no 'key' within it
-            ({"license": {"key": ""}}, "my_license", False), # empty license key
-            ({"license": {"key": "my_license"}}, "", False), # empty license_key to match against
-        ]
-
-    @parameterized.expand(has_license_test_cases())
+    @parameterized.expand([
+        # Positive cases
+        ({"license": {"key": "my_license"}}, "my_license", True),
+        ({"license": {"key": "apache-2.0"}}, "apache-2.0", True),
+        # Negative cases (license key exists but doesn't match)
+        ({"license": {"key": "other_license"}}, "my_license", False),
+        ({"license": {"key": "mit"}}, "apache-2.0", False),
+        # Edge cases: missing 'key' within 'license' object
+        ({"license": {"name": "Some License"}}, "my_license", False),
+        ({"license": {}}, "my_license", False), # empty license dict
+        # Edge cases: missing 'license' object
+        ({"name": "repo_without_license"}, "my_license", False),
+        ({}, "my_license", False), # empty repo
+        # Edge cases: license key is an empty string
+        ({"license": {"key": "my_license"}}, "", False),
+        ({"license": {"key": ""}}, "my_license", False), # repo has empty license key
+    ])
     def test_has_license(self, repo, license_key, expected):
-        """Test has_license method using a data provider."""
+        """Test has_license method with various valid inputs."""
         result = GithubOrgClient.has_license(repo, license_key)
         self.assertEqual(result, expected)
 
-    # --- End of the different approach for test_has_license ---
+    def test_has_license_raises_assertion_error_on_none_key(self):
+        """Test that has_license raises AssertionError when license_key is None."""
+        repo = {"license": {"key": "any_license"}}
+        license_key = None
+        with self.assertRaisesRegex(AssertionError, "license_key cannot be None"):
+            GithubOrgClient.has_license(repo, license_key)
 
 
 @parameterized_class([
@@ -127,8 +148,8 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         client = GithubOrgClient("google")
         self.assertEqual(client.public_repos(license="apache-2.0"),
                          self.apache2_repos)
-        # Verify calls. Call count will depend on test execution order.
-        # It's better to assert specific calls were made.
+        # Verify calls. The calls should have already been made by test_public_repos
+        # if tests run in the same class instance.
         self.mock_get.assert_any_call("https://api.github.com/orgs/google")
         self.mock_get.assert_any_call(self.org_payload["repos_url"])
 
