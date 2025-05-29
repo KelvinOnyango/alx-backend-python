@@ -29,11 +29,11 @@ class TestGithubOrgClient(unittest.TestCase):
         """Test _public_repos_url returns correct value"""
         test_payload = {"repos_url": "https://api.github.com/orgs/test/repos"}
         with patch('client.GithubOrgClient.org',
-                  new_callable=PropertyMock,
-                  return_value=test_payload):
+                   new_callable=PropertyMock,
+                   return_value=test_payload):
             client = GithubOrgClient("test")
             self.assertEqual(client._public_repos_url,
-                           test_payload["repos_url"])
+                             test_payload["repos_url"])
 
     @patch('client.get_json')
     def test_public_repos(self, mock_get_json):
@@ -45,21 +45,39 @@ class TestGithubOrgClient(unittest.TestCase):
         mock_get_json.return_value = test_repos_payload
 
         with patch('client.GithubOrgClient._public_repos_url',
-                  new_callable=PropertyMock,
-                  return_value="https://example.com/repos"):
+                   new_callable=PropertyMock,
+                   return_value="https://example.com/repos"):
             client = GithubOrgClient("test")
             repos = client.public_repos()
             self.assertEqual(repos, ["repo1", "repo2"])
             mock_get_json.assert_called_once()
 
-    @parameterized.expand([
-        ({"license": {"key": "my_license"}}, "my_license", True),
-        ({"license": {"key": "other_license"}}, "my_license", False),
-    ])
+    # --- Start of the different approach for test_has_license ---
+
+    @staticmethod
+    def has_license_test_cases():
+        """Provides test cases for test_has_license."""
+        return [
+            ({"license": {"key": "my_license"}}, "my_license", True),
+            ({"license": {"key": "other_license"}}, "my_license", False),
+            ({"license": {"key": "apache-2.0"}}, "apache-2.0", True),
+            ({"license": {"key": "apache-2.0"}}, "mit", False),
+            # New edge cases
+            ({"license": None}, "my_license", False),  # repo has 'license' but its value is None
+            ({}, "my_license", False),  # repo has no 'license' key at all
+            ({"name": "no_license_repo"}, "my_license", False), # repo missing 'license' entirely
+            ({"license": {"name": "GPL"}}, "my_license", False), # repo has 'license' but no 'key' within it
+            ({"license": {"key": ""}}, "my_license", False), # empty license key
+            ({"license": {"key": "my_license"}}, "", False), # empty license_key to match against
+        ]
+
+    @parameterized.expand(has_license_test_cases())
     def test_has_license(self, repo, license_key, expected):
-        """Test has_license method"""
+        """Test has_license method using a data provider."""
         result = GithubOrgClient.has_license(repo, license_key)
         self.assertEqual(result, expected)
+
+    # --- End of the different approach for test_has_license ---
 
 
 @parameterized_class([
@@ -98,12 +116,21 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         """Test public_repos integration"""
         client = GithubOrgClient("google")
         self.assertEqual(client.public_repos(), self.expected_repos)
+        self.mock_get.assert_any_call("https://api.github.com/orgs/google")
+        self.mock_get.assert_any_call(self.org_payload["repos_url"])
+        # Due to memoization, these two calls should be the only ones
+        self.assertEqual(self.mock_get.call_count, 2)
+
 
     def test_public_repos_with_license(self):
         """Test public_repos with license"""
         client = GithubOrgClient("google")
         self.assertEqual(client.public_repos(license="apache-2.0"),
-                        self.apache2_repos)
+                         self.apache2_repos)
+        # Verify calls. Call count will depend on test execution order.
+        # It's better to assert specific calls were made.
+        self.mock_get.assert_any_call("https://api.github.com/orgs/google")
+        self.mock_get.assert_any_call(self.org_payload["repos_url"])
 
 
 if __name__ == '__main__':
