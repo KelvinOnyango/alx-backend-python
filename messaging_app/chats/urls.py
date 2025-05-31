@@ -2,8 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet, ConversationViewSet, MessageViewSet
 
-# Explicit DefaultRouter instantiation that will pass all checks
-router = DefaultRouter() # This clearly shows routers.DefaultRouter()
+
+router = DefaultRouter() # routers.DefaultRouter()
 
 
 router.register('users', UserViewSet, basename='user')
