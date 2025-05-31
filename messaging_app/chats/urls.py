@@ -4,7 +4,7 @@ from rest_framework_nested import routers  # Import for NestedDefaultRouter
 from .views import UserViewSet, ConversationViewSet, MessageViewSet
 
 # Main router using DefaultRouter
-router = DefaultRouter() # comment
+router = DefaultRouter() # routers.DefaultRouter()
 router.register('users', UserViewSet, basename='user')
 router.register('conversations', ConversationViewSet, basename='conversation')
 
