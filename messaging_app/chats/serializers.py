@@ -1,86 +1,56 @@
 from rest_framework import serializers
-from .models import User, Conversation, Message
-from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.exceptions import ValidationError
+from .models import CustomUser, Conversation, Message
+
 
 class UserSerializer(serializers.ModelSerializer):
-    user_id = serializers.CharField(read_only=True)
-    email = serializers.CharField()
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    phone_number = serializers.CharField(required=False, allow_null=True)
-    online = serializers.SerializerMethodField()
+    """Serializer for the CustomUser model, excluding password and sensitive fields."""
+
+    full_name = serializers.SerializerMethodField()
+    username = serializers.CharField()
 
     class Meta:
-        model = User
+        model = CustomUser
         fields = [
-            'user_id', 'username', 'email', 'first_name', 'last_name',
-            'phone_number', 'online'
+            "user_id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "bio",
+            "profile_picture",
+            "phone_number",
+            "is_online",
+            "last_seen",
+            "full_name",
         ]
 
-    def get_online(self, obj):
-        return obj.online
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip()
+
 
 class MessageSerializer(serializers.ModelSerializer):
-    message_id = serializers.CharField(read_only=True)
-    message_body = serializers.CharField()
-    sent_at = serializers.SerializerMethodField()
+    """Serializer for the Message model, including sender and conversation details."""
+
     sender = UserSerializer(read_only=True)
+    message_body = serializers.CharField()
 
     class Meta:
         model = Message
-        fields = [
-            'message_id', 'sender', 'message_body', 'sent_at', 'read'
-        ]
-
-    def get_sent_at(self, obj):
-        return obj.sent_at
+        fields = ["message_id", "sender", "conversation", "message_body", "sent_at"]
+        read_only_fields = ["message_id", "sent_at"]
 
     def validate_message_body(self, value):
         if len(value.strip()) == 0:
-            raise ValidationError("Message body cannot be empty")
+            raise serializers.ValidationError("Message body cannot be empty.")
         return value
+
 
 class ConversationSerializer(serializers.ModelSerializer):
-    conversation_id = serializers.CharField(read_only=True)
+    """Serializer for the Conversation model, including participants and messages."""
+
     participants = UserSerializer(many=True, read_only=True)
-    messages = MessageSerializer(many=True, read_only=True)
-    created_at = serializers.SerializerMethodField()
+    messages = MessageSerializer(many=True, read_only=True, source="messages")
 
     class Meta:
         model = Conversation
-        fields = [
-            'conversation_id', 'participants', 'messages',
-            'created_at', 'updated_at'
-        ]
-
-    def get_created_at(self, obj):
-        return obj.created_at
-
-class ConversationCreateSerializer(serializers.ModelSerializer):
-    participants = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=User.objects.all(),
-        required=True
-    )
-
-    class Meta:
-        model = Conversation
-        fields = ['participants']
-
-    def validate_participants(self, value):
-        if len(value) < 2:
-            raise ValidationError("A conversation must have at least 2 participants")
-        return value
-
-class MessageCreateSerializer(serializers.ModelSerializer):
-    message_body = serializers.CharField()
-
-    class Meta:
-        model = Message
-        fields = ['message_body']
-
-    def validate(self, data):
-        if 'message_body' not in data or len(data['message_body'].strip()) == 0:
-            raise ValidationError({"message_body": "Message body cannot be empty"})
-        return data
+        fields = ["conversation_id", "participants", "created_at", "messages"]
