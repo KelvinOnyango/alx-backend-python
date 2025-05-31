@@ -1,6 +1,7 @@
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import User, Conversation, Message
 from .serializers import (
@@ -20,6 +21,13 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering_fields = ['username', 'last_seen']
     ordering = ['username']
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Conversation.objects.all()
@@ -36,9 +44,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.queryset.filter(participants=self.request.user)
 
-    def perform_create(self, serializer):
-        conversation = serializer.save()
-        conversation.participants.add(self.request.user)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        conversation = serializer.instance
+        conversation.participants.add(request.user)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            ConversationSerializer(conversation, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers
+        )
 
 class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -56,10 +73,28 @@ class MessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.queryset.filter(conversation__participants=self.request.user)
 
-    def perform_create(self, serializer):
-        conversation_id = self.request.data.get('conversation')
-        conversation = Conversation.objects.get(id=conversation_id)
-        if self.request.user in conversation.participants.all():
-            serializer.save(sender=self.request.user, conversation=conversation)
-        else:
-            raise PermissionDenied("You are not a participant in this conversation")
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        conversation_id = request.data.get('conversation')
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+            if request.user not in conversation.participants.all():
+                return Response(
+                    {"detail": "You are not a participant in this conversation"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            message = serializer.save(sender=request.user, conversation=conversation)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                MessageSerializer(message, context=self.get_serializer_context()).data,
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
+        except Conversation.DoesNotExist:
+            return Response(
+                {"detail": "Conversation not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
