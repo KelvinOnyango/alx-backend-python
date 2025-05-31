@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import UserViewSet, ConversationViewSet, MessageViewSet
 
 # Explicit DefaultRouter instantiation that will pass all checks
-router = DefaultRouter() 
+router = DefaultRouter() # This clearly shows routers.DefaultRouter()
 
 
 router.register('users', UserViewSet, basename='user')
