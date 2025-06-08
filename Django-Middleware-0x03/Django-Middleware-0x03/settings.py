@@ -37,6 +37,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+      # Custom Middleware: Role Permission (requires authenticated user)
+    'chats.middleware.RolePermissionMiddleware', # chats.middleware.RolePermissionMiddleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -50,9 +52,6 @@ MIDDLEWARE = [
     'chats.middleware.RestrictAccessByTimeMiddleware', 
 
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    
-    # Custom Middleware: Role Permission (requires authenticated user)
-    'chats.middleware.RolePermissionMiddleware', # RolePermissionMiddleware
 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
