@@ -1,0 +1,8 @@
+2025-06-08 07:34:01.123456 - User: Anonymous - Path: /admin/login/?next=/admin/
+2025-06-08 07:34:05.789012 - User: Anonymous - Path: /api/token/
+2025-06-08 07:34:06.345678 - User: testuser1 - Path: /api/token/
+2025-06-08 07:34:10.901234 - User: testuser1 - Path: /api/conversations/
+2025-06-08 07:34:15.567890 - User: testuser1 - Path: /api/messages/
+2025-06-08 07:34:20.123456 - User: testuser2 - Path: /api/messages/
+2025-06-08 07:34:25.789012 - User: testuser1 - Path: /api/messages/?conversation=1&page=1
+2025-06-08 07:34:30.345678 - User: Anonymous - Path: /api/conversations/
