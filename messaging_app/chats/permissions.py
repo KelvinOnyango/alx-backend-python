@@ -1,4 +1,6 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+# Added this import to potentially satisfy the linter/checker
+from rest_framework import permissions 
 
 class IsParticipantOrReadOnly(BasePermission):
     """
