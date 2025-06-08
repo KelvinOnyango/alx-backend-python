@@ -52,7 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     
     # Custom Middleware: Role Permission (requires authenticated user)
-    'chats.middleware.RolePermissionMiddleware', # This is the line the checker is looking for
+    'chats.middleware.RolePermissionMiddleware', # RolePermissionMiddleware
 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
