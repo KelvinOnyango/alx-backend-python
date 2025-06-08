@@ -1,5 +1,5 @@
 from rest_framework import viewsets, filters, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated # Keep this if needed for global default
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,6 +11,8 @@ from .serializers import (
     ConversationCreateSerializer,
     MessageCreateSerializer
 )
+# Import your custom permission
+from .permissions import IsParticipantOfConversation # This is the new import
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -29,7 +31,8 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # Apply the custom permission. IsAuthenticated will be handled by the global default.
+    permission_classes = [IsParticipantOfConversation] 
     queryset = Conversation.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['participants']
@@ -42,14 +45,25 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return ConversationSerializer
 
     def get_queryset(self):
-        return self.queryset.filter(participants=self.request.user)
+        # Ensure only conversations the user is a participant of are retrieved
+        # This complements the object-level permission for safety.
+        return self.queryset.filter(participants=self.request.user).distinct()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Ensure that the creating user is automatically added as a participant
+        # before saving the conversation.
+        participants_data = request.data.get('participants', [])
+        if request.user.id not in participants_data:
+            participants_data.append(request.user.id)
+        request.data['participants'] = participants_data
+
         self.perform_create(serializer)
         conversation = serializer.instance
-        conversation.participants.add(request.user)
+        # The line below might be redundant if participant is already added in serializer's create/save
+        # conversation.participants.add(request.user) 
         headers = self.get_success_headers(serializer.data)
         return Response(
             ConversationSerializer(conversation, context=self.get_serializer_context()).data,
@@ -58,7 +72,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         )
 
 class MessageViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # Apply the custom permission. IsAuthenticated will be handled by the global default.
+    permission_classes = [IsParticipantOfConversation]
     queryset = Message.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['conversation', 'sender', 'read']
@@ -71,7 +86,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         return MessageSerializer
 
     def get_queryset(self):
-        return self.queryset.filter(conversation__participants=self.request.user)
+        # Ensure only messages from conversations the user is a participant of are retrieved
+        # This complements the object-level permission for safety.
+        return self.queryset.filter(conversation__participants=self.request.user).distinct()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -80,11 +97,13 @@ class MessageViewSet(viewsets.ModelViewSet):
         conversation_id = request.data.get('conversation')
         try:
             conversation = Conversation.objects.get(id=conversation_id)
+            
+            # Use the permission class for checking access
+            # The IsParticipantOfConversation will handle this check, 
+            # so this explicit check might be removed depending on strictness.
+            # However, keeping it provides an early exit for clarity.
             if request.user not in conversation.participants.all():
-                return Response(
-                    {"detail": "You are not a participant in this conversation"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                raise PermissionDenied("You are not a participant in this conversation.")
             
             message = serializer.save(sender=request.user, conversation=conversation)
             headers = self.get_success_headers(serializer.data)
