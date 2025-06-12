@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
+from django.db import models
 from .models import Message, Notification
 
 User = get_user_model()
@@ -47,7 +49,11 @@ def conversation_view(request, user_id):
 
 @login_required
 def unread_messages_view(request):
-    unread_messages = Message.unread.for_user_optimized(request.user)
+    unread_messages = Message.objects.filter(
+        receiver=request.user,
+        read=False
+    ).select_related('sender').only('id', 'sender__username', 'content', 'timestamp')
+    
     return render(request, 'messaging/unread.html', {
         'unread_messages': unread_messages
     })
@@ -67,7 +73,7 @@ def message_history_view(request, message_id):
 
 
 @login_required
-def delete_account_view(request):
+def delete_user(request):
     if request.method == 'POST':
         request.user.delete()
         return redirect('home')
