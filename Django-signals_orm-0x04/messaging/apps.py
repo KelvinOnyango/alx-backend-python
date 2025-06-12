@@ -7,3 +7,6 @@ class MessagingConfig(AppConfig):
 
     def ready(self):
         import messaging.signals
+        from .models import Message
+        from .managers import UnreadMessagesManager
+        Message.unread = UnreadMessagesManager()
