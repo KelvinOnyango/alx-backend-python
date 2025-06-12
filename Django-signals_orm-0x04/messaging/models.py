@@ -17,6 +17,7 @@ class Message(models.Model):
                                      related_name='replies', on_delete=models.CASCADE)
 
     objects = models.Manager()  # Default manager
+    unread = models.Manager()  # Adding the required 'unread' manager
     
     class Meta:
         ordering = ['-timestamp']
