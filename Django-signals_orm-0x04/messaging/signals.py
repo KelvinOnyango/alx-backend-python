@@ -33,5 +33,6 @@ def log_message_history(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=User)
 def delete_user_related_data(sender, instance, **kwargs):
-    # All related data will be deleted through CASCADE
-    pass
+    # Adding the exact required filter and delete operations
+    Message.objects.filter(sender=instance).delete()
+    Message.objects.filter(receiver=instance).delete()
