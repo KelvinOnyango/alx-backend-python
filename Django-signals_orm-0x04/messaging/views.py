@@ -15,7 +15,6 @@ User = get_user_model()
 def conversation_view(request, user_id):
     other_user = get_object_or_404(User, pk=user_id)
     
-    # Get or set cache key
     cache_key = f'conversation_{request.user.id}_{user_id}'
     messages = cache.get(cache_key)
     
@@ -31,13 +30,12 @@ def conversation_view(request, user_id):
         parent_id = request.POST.get('parent_id')
         parent = Message.objects.get(pk=parent_id) if parent_id else None
         
-        message = Message.objects.create(
+        Message.objects.create(
             sender=request.user,
             receiver=other_user,
             content=content,
             parent_message=parent
         )
-        # Invalidate cache
         cache.delete(cache_key)
         return redirect('conversation', user_id=user_id)
     
