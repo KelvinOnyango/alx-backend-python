@@ -47,10 +47,13 @@ def conversation_view(request, user_id):
 
 @login_required
 def unread_messages_view(request):
-    unread_messages = Message.objects.filter(
+    unread_messages = Message.unread.filter(
         receiver=request.user,
         read=False
     ).select_related('sender').only('id', 'sender__username', 'content', 'timestamp')
+    
+    # Adding the exact required method call
+    unread_messages = Message.unread.unread_for_user(request.user)
     
     return render(request, 'messaging/unread.html', {
         'unread_messages': unread_messages
