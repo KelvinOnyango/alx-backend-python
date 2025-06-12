@@ -23,7 +23,8 @@ def log_message_history(sender, instance, **kwargs):
             if old_message.content != instance.content:
                 MessageHistory.objects.create(
                     message=instance,
-                    content=old_message.content
+                    content=old_message.content,
+                    edited_by=instance.edited_by if hasattr(instance, 'edited_by') else instance.sender
                 )
                 instance.edited = True
         except Message.DoesNotExist:
