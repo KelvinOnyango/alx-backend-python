@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app
+  labels:
+    app: django-messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django-messaging
+  template:
+    metadata:
+      labels:
+        app: django-messaging
+    spec:
+      containers:
+        - name: django-app
+          image: your-django-image:1.0 # Replace with your actual Docker image
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: messaging_app.settings
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-service
+spec:
+  type: ClusterIP
+  selector:
+    app: django-messaging
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

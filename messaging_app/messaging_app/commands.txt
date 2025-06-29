@@ -1,0 +1,8 @@
+# Command to apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# Command to enable ingress in minikube
+minikube addons enable ingress
+
+# Command to check ingress status
+kubectl get ingress
