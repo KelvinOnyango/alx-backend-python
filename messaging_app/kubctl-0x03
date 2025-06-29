@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Apply the updated deployment
+kubectl apply -f blue_deployment.yaml
+
+# Monitor the rollout status
+kubectl rollout status deployment/django-messaging-app
+
+# Get service URL for testing
+SERVICE_URL=$(minikube service django-messaging-service --url)
+
+# Continuously test the service during rollout
+echo "Testing service during rollout..."
+for i in {1..30}; do
+    response=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL)
+    echo "Request $i: HTTP $response"
+    sleep 1
+done
+
+# Verify the rolling update is complete
+echo "Rollout complete. Current pods:"
+kubectl get pods
