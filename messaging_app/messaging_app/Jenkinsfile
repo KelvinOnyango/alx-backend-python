@@ -17,7 +17,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 dir(PROJECT_DIR) {
-                    sh 'pip install -r requirements.txt'
+                    // Explicit path to requirements.txt and using pip3
+                    sh 'pip3 install -r messaging_app/requirements.txt'
                 }
             }
         }
@@ -31,6 +32,26 @@ pipeline {
             post {
                 always {
                     junit "${PROJECT_DIR}/test-results.xml"
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir(PROJECT_DIR) {
+                    sh 'docker build -t messaging-app:latest .'
+                }
+            }
+        }
+        
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    dir(PROJECT_DIR) {
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        sh 'docker tag messaging-app:latest $DOCKER_USER/messaging-app:latest'
+                        sh 'docker push $DOCKER_USER/messaging-app:latest'
+                    }
                 }
             }
         }
